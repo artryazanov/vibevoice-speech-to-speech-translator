@@ -4,6 +4,7 @@ FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    DEBIAN_FRONTEND=noninteractive \
     WORKDIR=/app
 
 # Set working directory
