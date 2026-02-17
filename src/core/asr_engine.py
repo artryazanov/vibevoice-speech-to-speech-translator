@@ -30,13 +30,15 @@ class ASREngine:
         
         self.processor = VibeVoiceASRProcessor.from_pretrained(
             config.models.asr_model_path,
-            language_model_pretrained_name="Qwen/Qwen2.5-7B" 
+            language_model_pretrained_name="Qwen/Qwen2.5-7B",
+            cache_dir=config.models.cache_dir
         )
         self.model = VibeVoiceASRForConditionalGeneration.from_pretrained(
             config.models.asr_model_path,
             torch_dtype=self.dtype,
             low_cpu_mem_usage=True,
-            trust_remote_code=True
+            trust_remote_code=True,
+            cache_dir=config.models.cache_dir
         ).to(self.device)
         self.model.eval()
 

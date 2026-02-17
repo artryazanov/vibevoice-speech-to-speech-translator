@@ -31,8 +31,11 @@ RUN pip install --upgrade pip && \
 # Copy the rest of the application
 COPY . .
 
-# Create directories for output and temp files
-RUN mkdir -p output temp_files
+# Create directories for output, temp files, and models
+RUN mkdir -p output temp_files models
+
+# Expose models directory as volume for persistence
+VOLUME ["/app/models"]
 
 # Define the entrypoint
 ENTRYPOINT ["python", "main.py"]

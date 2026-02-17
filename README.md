@@ -93,9 +93,12 @@ docker build -t vibe-translator .
 ```
 
 ### Run
-To run the container, mounting input/output directories:
+To run the container, mounting input/output directories and **persisting models**:
 ```bash
-docker run --gpus all -v /path/to/data:/data vibe-translator \
+docker run --gpus all \
+  -v /path/to/data:/data \
+  -v $(pwd)/models:/app/models \
+  vibe-translator \
   --input_file "/data/input.mp3" \
   --output_file "/data/output.wav" \
   --target_lang "ru"
@@ -103,3 +106,4 @@ docker run --gpus all -v /path/to/data:/data vibe-translator \
 **Notes:**
 - `--gpus all` is required for GPU access.
 - `-v /path/to/data:/data` mounts a local directory to `/data` in the container.
+- `-v $(pwd)/models:/app/models` mounts a local directory to persist downloaded models.

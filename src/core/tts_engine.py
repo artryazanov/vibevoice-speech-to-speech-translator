@@ -26,11 +26,15 @@ class TTSEngine:
         
         self.model = VibeVoiceForConditionalGeneration.from_pretrained(
             config.models.tts_model_path,
-            torch_dtype=self.dtype
+            torch_dtype=self.dtype,
+            cache_dir=config.models.cache_dir
         ).to(self.device)
         self.model.eval()
         
-        self.tokenizer = VibeVoiceTokenizer.from_pretrained(config.models.tts_model_path)
+        self.tokenizer = VibeVoiceTokenizer.from_pretrained(
+            config.models.tts_model_path,
+            cache_dir=config.models.cache_dir
+        )
         
         # Cache for speaker prompts to maintain consistency
         self.speaker_prompts = {} 

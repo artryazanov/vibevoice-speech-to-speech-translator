@@ -15,7 +15,8 @@ class TranslatorEngine:
             "translation",
             model=config.models.translator_model_path,
             device=self.device,
-            torch_dtype=torch.float16 if config.models.compute_dtype == "float16" else torch.float32
+            torch_dtype=torch.float16 if config.models.compute_dtype == "float16" else torch.float32,
+            model_kwargs={"cache_dir": config.models.cache_dir}
         )
 
     def translate(self, text: str, src_lang: str, tgt_lang: str) -> str:

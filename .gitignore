@@ -35,6 +35,7 @@ ENV/
 # Project specific
 temp_files/
 output/
+models/
 *.log
 
 # Models (if downloaded manually)
