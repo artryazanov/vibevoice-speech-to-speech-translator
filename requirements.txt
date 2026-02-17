@@ -20,3 +20,4 @@ aiortc
 uvicorn[standard]
 fastapi
 requests
+yt-dlp>=2023.10.0

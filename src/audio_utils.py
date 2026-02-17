@@ -1,4 +1,5 @@
 import logging
+import subprocess
 from pathlib import Path
 from typing import Union, List, Dict
 from pydub import AudioSegment
@@ -57,3 +58,33 @@ class AudioUtils:
             current_pos = start_ms + len(audio_chunk)
             
         return final_audio
+
+    @staticmethod
+    def merge_video_audio(video_path: str, audio_path: str, output_path: str):
+        """
+        Merges video stream from video_path with audio stream from audio_path.
+        Saves the result to output_path.
+        """
+        logger.info(f"Merging video '{video_path}' with audio '{audio_path}' -> '{output_path}'")
+        
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", video_path,
+            "-i", audio_path,
+            "-c:v", "copy",  # Copy video without re-encoding
+            "-c:a", "aac",   # Encode audio to aac
+            "-map", "0:v:0", # Take video from 1st file
+            "-map", "1:a:0", # Take audio from 2nd file
+            "-shortest",     # Cut by the shortest stream
+            output_path
+        ]
+        
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error(f"FFmpeg merge failed: {result.stderr}")
+                raise RuntimeError(f"FFmpeg merge failed: {result.stderr}")
+            logger.info("Video merge successful.")
+        except Exception as e:
+            logger.error(f"Failed to merge video and audio: {e}")
+            raise
