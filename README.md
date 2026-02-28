@@ -1,7 +1,6 @@
 # VibeVoice Speech-to-Speech Translator
 
-This project implements a local speech-to-speech translation pipeline using Microsoft's VibeVoice models for ASR and TTS, and NLLB for text translation.
-
+This project implements a professional-grade local speech-to-speech translation pipeline. It combines Microsoft's VibeVoice (ASR) with 8-bit quantization, NLLB-200 for batch text translation, and Coqui XTTS v2 for high-fidelity voice cloning.
 ## Prerequisites
 
 1. **Python 3.10+**
@@ -72,17 +71,21 @@ You can adjust model paths and settings in `src/config.py`.
 
 ## Features
 
-- **Speech-to-Speech Translation**: Preserves speaker identity using VibeVoice.
+- **Pristine Voice Cloning**: Uses XTTS v2 to synthesize speech natively capturing original speaker emotion and timbre continuously across the timeline.
+- **VRAM Optimized Pipeline**: Sequentially manages ASR, translation, and TTS lifecycles in isolated temporary contexts with aggressive CUDA garbage collection. The 7B ASR model is loaded via 8-bit quantization, safely staying within 16GB VRAM bounds.
+- **Precision Audio Syncing**: Utilizes `pyrubberband` time-stretching algorithms to ensure flawlessly synchronized generated speech that identically maps to source ASR bounding boxes.
+- **Batch Translation Processing**: NLLB pipelines are fired efficiently over full text extraction arrays.
 - **YouTube Support**: Download and translate videos directly from YouTube URLs.
 - **Video Processing**: Supports video file input (`.mp4`, `.mkv`, etc.) and automatically merges translated audio with the original video.
-- **Automatic Output Naming**: Automatically generates output filenames if not specified.
 
 ## Architecture
 
-- **ASR**: VibeVoice ASR (Transcribes and identifies speakers)
-- **Translation**: NLLB-200 (Translates text)
-- **TTS**: VibeVoice TTS (Synthesizes speech preserving speaker identity)
-- **Orchestrator**: Manages the pipeline, downloads, and media merging.
+- **ASR**: VibeVoice ASR (8-bit quantized, transcribes and diarizes speakers)
+- **Voice Extraction**: Orchestrator slices 3-6 second reference audio segments per speaker.
+- **Translation**: NLLB-200 (Batch processes texts to target language)
+- **TTS**: Coqui XTTS v2 (Synthesizes speech preserving exact speaker identity using reference wav files)
+- **Audio Sync**: `pyrubberband` dynamically time-stretches generated audio chunks to match original start/end metrics.
+- **Orchestrator**: Safely wraps all I/O via `tempfile`, manages sequential GPU memory execution, downloads, and final media output merging.
 
 ## Docker Support
 

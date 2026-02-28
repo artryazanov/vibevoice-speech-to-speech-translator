@@ -37,9 +37,10 @@ class ASREngine:
             config.models.asr_model_path,
             torch_dtype=self.dtype,
             low_cpu_mem_usage=True,
+            load_in_8bit=True, # Added for VRAM management
             trust_remote_code=True,
             cache_dir=config.models.cache_dir
-        ).to(self.device)
+        )
         self.model.eval()
 
     def transcribe(self, audio_path: str) -> List[Dict[str, Any]]:

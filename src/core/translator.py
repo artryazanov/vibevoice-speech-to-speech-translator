@@ -19,35 +19,34 @@ class TranslatorEngine:
             model_kwargs={"cache_dir": config.models.cache_dir}
         )
 
-    def translate(self, text: str, src_lang: str, tgt_lang: str) -> str:
+    def translate_batch(self, texts: list[str], src_lang: str, tgt_lang: str) -> list[str]:
         """
-        Translated text using NLLB.
+        Translates a batch of texts using NLLB.
         NLLB requires FLORES-200 language codes (e.g., eng_Latn, rus_Cyrl).
         """
-        if not text:
-            return ""
+        if not texts:
+            return []
             
-        # Simplified mapping logic for demo purposes. 
-        # Ideally, this should be a robust mapping function or strict input requirement.
+        # Simplified mapping logic for demo purposes.
         lang_map = {
             "en": "eng_Latn",
             "ru": "rus_Cyrl",
             "fr": "fra_Latn",
             "es": "spa_Latn",
             "de": "deu_Latn",
-            # Add more as needed
         }
         
-        # Default to English/Russian if not found, or use input as is if it looks like a code
         src_code = lang_map.get(src_lang, src_lang if "_" in src_lang else "eng_Latn")
         tgt_code = lang_map.get(tgt_lang, tgt_lang if "_" in tgt_lang else "rus_Cyrl")
         
         try:
-            # NLLB pipeline handles the forced_bos_token automatically if src/tgt are passed
-            # But standard pipeline might need specific args. 
-            # For NLLB/M2M100, we usually use `src_lang` and `tgt_lang` in generate
-            result = self.translator(text, src_lang=src_code, tgt_lang=tgt_code, max_length=512)
-            return result[0]['translation_text']
+            # the pipeline can process a list of texts
+            results = self.translator(texts, src_lang=src_code, tgt_lang=tgt_code, max_length=512, batch_size=len(texts))
+            return [res['translation_text'] for res in results]
         except Exception as e:
-            logger.error(f"Translation failed: {e}")
-            return text # Return original text on failure
+            logger.error(f"Batch translation failed: {e}")
+            return texts # Return original texts on failure
+            
+    def translate(self, text: str, src_lang: str, tgt_lang: str) -> str:
+        """Single translation wrapper for compatibility."""
+        return self.translate_batch([text], src_lang, tgt_lang)[0]

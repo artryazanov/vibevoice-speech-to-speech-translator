@@ -35,27 +35,54 @@ class AudioUtils:
     def merge_audio_timeline(segments: List[Dict], total_duration_ms: int) -> AudioSegment:
         """
         Assembles the final audio file from segments.
-        segments: list of dicts {'audio': AudioSegment, 'start_ms': int}
+        segments: list of dicts {'audio': AudioSegment, 'start_ms': int, 'end_ms': int}
         """
+        import soundfile as sf
+        import pyrubberband as pyrb
+        import io
+        import numpy as np
+
         final_audio = AudioSegment.silent(duration=total_duration_ms)
-        
-        # Simple strategy: overlay segments onto the timeline at their original start times.
-        # Future improvement: implement timeline shifting logic if translation exceeds original duration.
-        current_pos = 0
         
         for seg in sorted(segments, key=lambda x: x['start_ms']):
             start_ms = seg['start_ms']
-            audio_chunk = seg['audio']
+            end_ms = seg.get('end_ms', start_ms + len(seg['audio']))
+            target_duration_ms = end_ms - start_ms
             
-            # If the previous segment overlaps with this one, shift the current one start time
-            # However, for speech-to-speech where we want to keep original timing as much as possible,
-            # we might want to allow some overlap or compress silence.
-            # For now, we strictly ensure no overlap by shifting forward if needed.
-            if start_ms < current_pos:
-                start_ms = current_pos
+            if target_duration_ms <= 0:
+                continue
+                
+            audio_chunk = seg['audio']
+            original_duration_ms = len(audio_chunk)
+            
+            # Apply time-stretching if durations differ significantly
+            if original_duration_ms > 0 and abs(original_duration_ms - target_duration_ms) > 50:
+                # Calculate stretch ratio (original / target)
+                # pyrubberband time_stretch rate where > 1.0 means faster (shorter output)
+                rate = original_duration_ms / target_duration_ms
+                
+                # Export chunk to numpy array
+                samples = np.array(audio_chunk.get_array_of_samples()).astype(np.float32) / 32768.0
+                
+                # Reshape for multi-channel if needed
+                if audio_chunk.channels > 1:
+                    samples = samples.reshape((-1, audio_chunk.channels))
+                
+                # Stretch
+                try:
+                    stretched_samples = pyrb.time_stretch(samples, audio_chunk.frame_rate, rate)
+                    
+                    # Convert back to AudioSegment
+                    # ensure 16-bit PCM
+                    stretched_samples = np.clip(stretched_samples * 32767.0, -32768, 32767).astype(np.int16)
+                    with io.BytesIO() as wav_io:
+                        sf.write(wav_io, stretched_samples, audio_chunk.frame_rate, format='WAV', subtype='PCM_16')
+                        wav_io.seek(0)
+                        audio_chunk = AudioSegment.from_wav(wav_io)
+                except Exception as e:
+                    logger.warning(f"Time-stretching failed: {e}. Using original chunk.")
             
             final_audio = final_audio.overlay(audio_chunk, position=start_ms)
-            current_pos = start_ms + len(audio_chunk)
             
         return final_audio
 

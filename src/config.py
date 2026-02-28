@@ -6,7 +6,7 @@ from typing import Optional
 @dataclass
 class ModelConfig:
     asr_model_path: str = "microsoft/VibeVoice-ASR" # Local path or HuggingFace ID
-    tts_model_path: str = "microsoft/VibeVoice-1.5B" # Local path or HuggingFace ID
+    tts_model_path: str = "tts_models/multilingual/multi-dataset/xtts_v2" # Local path or HuggingFace ID
     translator_model_path: str = "facebook/nllb-200-distilled-600M" # Lightweight and high-quality translation model
     device: str = "cuda"  # "cuda", "cpu", "mps"
     compute_dtype: str = "float16" # bfloat16 or float16

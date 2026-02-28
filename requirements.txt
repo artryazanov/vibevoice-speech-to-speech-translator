@@ -2,7 +2,7 @@ torch>=2.5.1
 torchaudio
 transformers>=4.51.3,<5.0.0
 pydub
-numpy
+numpy<2.0.0
 scipy
 librosa
 fire
@@ -21,3 +21,7 @@ uvicorn[standard]
 fastapi
 requests
 yt-dlp>=2023.10.0
+TTS==0.22.0
+pyrubberband
+soundfile
+bitsandbytes

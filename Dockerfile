@@ -1,5 +1,5 @@
-# Use PyTorch base image with CUDA support
-FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime
+# Use NVIDIA CUDA base image compatible with PyTorch
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -10,22 +10,27 @@ ENV PYTHONUNBUFFERED=1 \
 # Set working directory
 WORKDIR $WORKDIR
 
-# Install system dependencies
-# ffmpeg: required for audio processing (pydub)
-# libsndfile1: required for soundfile
-# git: required for some pip installations or submodule checks
+# Install system dependencies including Python 3.10
 RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
     ffmpeg \
     libsndfile1 \
     git \
-    && rm -rf /var/lib/apt/lists/*
+    build-essential \
+    && rm -rf /var/lib/apt/lists/* && \
+    ln -s /usr/bin/python3.10 /usr/bin/python
 
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
 
-# Install Python dependencies
-# Upgrade pip first
-RUN pip install --upgrade pip && \
+# Upgrade pip and install Python dependencies
+# Pyworld 0.2.10 (TTS dependency) fails to compile against numpy 2.x, so we build it explicitly first without build isolation
+# It also possesses a setup.py bug making it crash on modern pip/setuptools. We use ubuntu's native pip 22 and setuptools 59.
+RUN pip install "numpy<2.0.0" Cython wheel && \
+    pip install --no-build-isolation pyworld==0.2.10 && \
+    python -m pip install --upgrade pip && \
+    pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application
