@@ -5,6 +5,8 @@ FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DEBIAN_FRONTEND=noninteractive \
+    COQUI_TOS_AGREED=1 \
+    TTS_HOME=/app/models \
     WORKDIR=/app
 
 # Set working directory
@@ -18,6 +20,8 @@ RUN apt-get update && apt-get install -y \
     libsndfile1 \
     git \
     build-essential \
+    rubberband-cli \
+    nodejs \
     && rm -rf /var/lib/apt/lists/* && \
     ln -s /usr/bin/python3.10 /usr/bin/python
 

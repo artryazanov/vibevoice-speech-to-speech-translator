@@ -1,5 +1,8 @@
 # VibeVoice Speech-to-Speech Translator
 
+> [!WARNING]
+> **This project is currently under active development.** The features and capabilities described below are intended goals and have not all been fully achieved or stabilized yet. Expect bugs, missing features, and breaking changes.
+
 This project implements a professional-grade local speech-to-speech translation pipeline. It combines Microsoft's VibeVoice (ASR) with 8-bit quantization, NLLB-200 for batch text translation, and Coqui XTTS v2 for high-fidelity voice cloning.
 ## Prerequisites
 

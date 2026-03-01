@@ -56,7 +56,12 @@ class ASREngine:
             sampling_rate=16000, # Standard for ASR
             return_tensors="pt",
             padding=True
-        ).to(self.device, dtype=self.dtype)
+        ).to(self.device)
+
+        # Cast float tensors to the model's dtype
+        for k, v in inputs.items():
+            if torch.is_floating_point(v):
+                inputs[k] = v.to(self.dtype)
 
         with torch.no_grad():
             outputs = self.model.generate(
