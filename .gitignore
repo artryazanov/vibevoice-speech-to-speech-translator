@@ -51,3 +51,4 @@ models/
 # OS specific
 .DS_Store
 Thumbs.db
+.env

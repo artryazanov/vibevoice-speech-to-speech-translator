@@ -87,10 +87,21 @@ class LocalTranslationOrchestrator:
                 start_time = time.time()
                 logger.info(f"Starting pipeline: {input_path} -> {output_path} ({target_lang})")
                 
+                # --- Extract Audio to WAV ---
+                logger.info("Extracting audio to WAV format...")
+                temp_wav_path = str(temp_dir_path / "asr_input.wav")
+                try:
+                    original_audio = AudioUtils.load_audio(input_path)
+                    AudioUtils.save_audio(original_audio, temp_wav_path)
+                    total_duration = len(original_audio)
+                except Exception as e:
+                    logger.error(f"Failed to load original audio for ASR: {e}")
+                    raise
+                
                 # --- STAGE 1: ASR & Diarization ---
                 logger.info("--- STAGE 1: ASR ---")
                 asr = ASREngine()
-                segments = asr.transcribe(input_path)
+                segments = asr.transcribe(temp_wav_path)
                 logger.info(f"Detected {len(segments)} segments.")
                 
                 self._free_vram(asr)
@@ -102,11 +113,9 @@ class LocalTranslationOrchestrator:
                 # --- STAGE 2: Extract Speaker References ---
                 logger.info("--- STAGE 2: Extracting References ---")
                 try:
-                    original_audio = AudioUtils.load_audio(input_path)
-                    total_duration = len(original_audio)
                     speaker_refs = self._extract_speaker_samples(original_audio, segments, temp_dir_path)
                 except Exception as e:
-                    logger.error(f"Failed to load original audio or extract references: {e}")
+                    logger.error(f"Failed to extract speaker references: {e}")
                     raise
                     
                 # --- STAGE 3: Batch Translation ---

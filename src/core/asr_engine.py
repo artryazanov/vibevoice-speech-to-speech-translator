@@ -1,100 +1,113 @@
+import gc
 import torch
 import logging
 from typing import List, Dict, Any
-from transformers import AutoTokenizer, AutoModelForCausalLM
-
-# Import VibeVoice classes. 
-# NOTE: These imports assume the user has placed the 'vibevoice' source code in the project root.
-try:
-    from vibevoice.modular.modeling_vibevoice_asr import VibeVoiceASRForConditionalGeneration
-    from vibevoice.processor.vibevoice_asr_processor import VibeVoiceASRProcessor
-except ImportError:
-    # Fallback/Mock for environment where vibevoice is not yet present (e.g. CI/Linter)
-    # This prevents immediate crash if the user hasn't copied the files yet.
-    logging.warning("VibeVoice modules not found. Ensure 'vibevoice/' directory is in project root.")
-    VibeVoiceASRForConditionalGeneration = None
-    VibeVoiceASRProcessor = None
-
+from faster_whisper import WhisperModel
+from pyannote.audio import Pipeline
 from src.config import config
 
 logger = logging.getLogger(__name__)
 
 class ASREngine:
     def __init__(self):
-        if not VibeVoiceASRForConditionalGeneration or not VibeVoiceASRProcessor:
-            raise ImportError("VibeVoice modules not available. Please install the VibeVoice library in the project root.")
-
-        logger.info("Loading VibeVoice ASR...")
         self.device = config.models.device
-        self.dtype = torch.float16 if config.models.compute_dtype == "float16" else torch.bfloat16
-        
-        self.processor = VibeVoiceASRProcessor.from_pretrained(
-            config.models.asr_model_path,
-            language_model_pretrained_name="Qwen/Qwen2.5-7B",
-            cache_dir=config.models.cache_dir
-        )
-        self.model = VibeVoiceASRForConditionalGeneration.from_pretrained(
-            config.models.asr_model_path,
-            torch_dtype=self.dtype,
-            low_cpu_mem_usage=True,
-            load_in_8bit=True, # Added for VRAM management
-            trust_remote_code=True,
-            cache_dir=config.models.cache_dir
-        )
-        self.model.eval()
+        self.compute_type = "float16" if config.models.compute_dtype == "float16" else "float32"
+
+    def _free_memory(self, model):
+        """Local memory cleanup during the ASR phase"""
+        del model
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
 
     def transcribe(self, audio_path: str) -> List[Dict[str, Any]]:
-        """
-        Returns a list of segments:
-        [{'speaker': 'Speaker A', 'start': 0.5, 'end': 2.3, 'text': 'Hello world'}, ...]
-        """
-        logger.info(f"Transcribing {audio_path}...")
+        # === 1. TRANSCRIPTION PHASE ===
+        logger.info(f"Loading Faster-Whisper ({config.models.asr_model_path})...")
+        whisper_model = WhisperModel(
+            config.models.asr_model_path, 
+            device=self.device, 
+            compute_type=self.compute_type,
+            download_root=config.models.cache_dir
+        )
         
-        # VibeVoice processor handles audio loading if path is passed
-        inputs = self.processor(
-            audio=audio_path,
-            sampling_rate=16000, # Standard for ASR
-            return_tensors="pt",
-            padding=True
-        ).to(self.device)
+        logger.info("Transcribing audio...")
+        segments_generator, _ = whisper_model.transcribe(
+            audio_path, 
+            beam_size=5, 
+            vad_filter=True,
+            vad_parameters=dict(min_silence_duration_ms=500)
+        )
+        
+        # Save results to a list in memory, as the generator only works in a loop
+        whisper_segments = []
+        for s in segments_generator:
+            whisper_segments.append({"start": float(s.start), "end": float(s.end), "text": s.text.strip()})
+            
+        # STRICT VRAM UNLOADING
+        logger.info("Unloading Faster-Whisper from VRAM...")
+        self._free_memory(whisper_model)
 
-        # Cast float tensors to the model's dtype
-        for k, v in inputs.items():
-            if torch.is_floating_point(v):
-                inputs[k] = v.to(self.dtype)
-
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=2048,
-                temperature=0.0, # Greedy for accuracy
-                do_sample=False
+        # === 2. DIARIZATION PHASE ===
+        logger.info("Loading Pyannote Diarization...")
+        diarization_pipeline = Pipeline.from_pretrained(
+            config.models.diarization_model_path, 
+            use_auth_token=config.models.hf_token
+        )
+        
+        if diarization_pipeline is None:
+            raise RuntimeError(
+                f"Failed to load Pyannote diarization pipeline '{config.models.diarization_model_path}'. "
+                "This is likely because the model is gated and requires a valid Hugging Face token. "
+                "Please ensure you have accepted the user conditions on the Hugging Face model page "
+                "and that you are passing the HF_TOKEN environment variable correctly (e.g., "
+                "`docker run -e HF_TOKEN=your_token ...`)."
             )
             
-        # Decode output
-        generated_ids = outputs[0][inputs.input_ids.shape[1]:]
-        transcription = self.processor.decode(generated_ids, skip_special_tokens=True)
+        diarization_pipeline.to(torch.device(self.device))
         
-        # Parse structured output from VibeVoice
-        try:
-            # Assuming post_process_transcription exists in the processor (as per VibeVoice examples)
-            if hasattr(self.processor, 'post_process_transcription'):
-                structured_segments = self.processor.post_process_transcription(transcription)
-            else:
-                # Basic fallback if method is missing or API changed - needs actual implementation details
-                # For now, we assume standard VibeVoice structured output parsing
-                logger.warning("post_process_transcription not found, returning raw text in single segment")
-                return [{'speaker': 'Unknown', 'start': 0.0, 'end': 0.0, 'text': transcription}]
+        logger.info("Processing diarization...")
+        diarization_result = diarization_pipeline(audio_path)
+        
+        # STRICT VRAM UNLOADING
+        logger.info("Unloading Pyannote from VRAM...")
+        self._free_memory(diarization_pipeline)
 
-            results = []
-            for seg in structured_segments:
-                results.append({
-                    'speaker': seg.get('speaker_id', 'Unknown'),
-                    'start': float(seg.get('start_time', 0.0)),
-                    'end': float(seg.get('end_time', 0.0)),
-                    'text': seg.get('text', '').strip()
-                })
-            return results
-        except Exception as e:
-            logger.error(f"Error parsing transcription: {e}. Raw text: {transcription}")
-            return []
+        # === 3. MERGING RESULTS ===
+        logger.info("Merging text with speakers...")
+        return self._assign_speakers(whisper_segments, diarization_result)
+
+    def _assign_speakers(self, whisper_segments: List[Dict], diarization_result) -> List[Dict[str, Any]]:
+        """Matches Whisper text with speaker timecodes from Pyannote"""
+        final_segments = []
+        
+        # Convert Pyannote results into a convenient list of dictionaries
+        speakers = []
+        for turn, _, speaker in diarization_result.itertracks(yield_label=True):
+            speakers.append({"start": turn.start, "end": turn.end, "speaker": speaker})
+
+        for w_seg in whisper_segments:
+            w_start, w_end = w_seg["start"], w_seg["end"]
+            
+            # Find the speaker whose time segment has the maximum overlap with the text
+            max_overlap = 0
+            assigned_speaker = "Unknown"
+            
+            for spk in speakers:
+                # Calculate segment overlap
+                overlap_start = max(w_start, spk["start"])
+                overlap_end = min(w_end, spk["end"])
+                overlap = max(0, overlap_end - overlap_start)
+                
+                if overlap > max_overlap:
+                    max_overlap = overlap
+                    assigned_speaker = spk["speaker"]
+            
+            final_segments.append({
+                'speaker': assigned_speaker,
+                'start': w_start,
+                'end': w_end,
+                'text': w_seg["text"]
+            })
+            
+        return final_segments

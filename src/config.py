@@ -2,10 +2,16 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 @dataclass
 class ModelConfig:
-    asr_model_path: str = "microsoft/VibeVoice-ASR" # Local path or HuggingFace ID
+    asr_model_path: str = "large-v3" # Model name for Faster-Whisper
+    diarization_model_path: str = "pyannote/speaker-diarization-3.1"
+    hf_token: str = os.getenv("HF_TOKEN", "") # Required for Pyannote
+    
     tts_model_path: str = "tts_models/multilingual/multi-dataset/xtts_v2" # Local path or HuggingFace ID
     translator_model_path: str = "facebook/nllb-200-distilled-600M" # Lightweight and high-quality translation model
     device: str = "cuda"  # "cuda", "cpu", "mps"
