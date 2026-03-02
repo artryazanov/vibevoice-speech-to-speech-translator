@@ -44,10 +44,6 @@ models/
 *.bin
 *.SafeTensors
 
-# Docker
-.dockerignore
-!Dockerfile
-
 # OS specific
 .DS_Store
 Thumbs.db
