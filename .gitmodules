@@ -1,3 +1,0 @@
-[submodule "vibevoice"]
-	path = external/vibevoice
-	url = https://github.com/microsoft/VibeVoice.git

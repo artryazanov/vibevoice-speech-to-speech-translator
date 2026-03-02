@@ -7,21 +7,7 @@ from unittest.mock import MagicMock
 # Add project root to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Add VibeVoice submodule path
-vibe_path = Path(__file__).parent.parent / "external" / "vibevoice"
-if vibe_path.exists():
-    sys.path.append(str(vibe_path))
-else:
-    print(f"Warning from test: VibeVoice submodule not found at {vibe_path}")
 
-# Mock vibevoice modules since they are external
-sys.modules['vibevoice'] = MagicMock()
-sys.modules['vibevoice.modular'] = MagicMock()
-sys.modules['vibevoice.modular.modeling_vibevoice_asr'] = MagicMock()
-sys.modules['vibevoice.processor'] = MagicMock()
-sys.modules['vibevoice.processor.vibevoice_asr_processor'] = MagicMock()
-sys.modules['vibevoice.modular.modeling_vibevoice'] = MagicMock()
-sys.modules['vibevoice.modular.modular_vibevoice_tokenizer'] = MagicMock()
 
 # Mock other heavy dependencies usually not present in minimal envs
 sys.modules['torch'] = MagicMock()

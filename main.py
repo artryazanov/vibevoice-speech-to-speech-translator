@@ -3,14 +3,6 @@ from pathlib import Path
 from typing import Optional
 import fire
 
-# Add path to VibeVoice submodule
-# This must be done before importing any module that depends on 'vibevoice' package
-vibe_path = Path(__file__).parent / "external" / "vibevoice"
-if vibe_path.exists():
-    sys.path.append(str(vibe_path))
-else:
-    print(f"Warning: VibeVoice submodule not found at {vibe_path}")
-
 from src.orchestrator import LocalTranslationOrchestrator
 
 def main(input_file: str, output_file: Optional[str] = None, target_lang: str = "ru", src_lang: str = "en"):
